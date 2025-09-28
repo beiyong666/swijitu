@@ -8,4 +8,4 @@ compatibility_date = "2025-09-28"
 [kv_namespaces]
   # Provide your namespace id and binding name here
   # Example:
-  # { binding = "sjt", id = "ns-07gCyAFe78zN" }
+  # { binding = "wj", id = "your-namespace-id" }

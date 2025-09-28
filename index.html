@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Random Image Manager - Admin</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Random Image Manager</h1>
+
+    <section>
+      <h2>Create Directory</h2>
+      <input id="newDir" placeholder="e.g. img/cover" />
+      <button id="createDir">Create</button>
+      <div id="createResult" class="note"></div>
+    </section>
+
+    <section>
+      <h2>Manage Directory</h2>
+      <input id="selDir" placeholder="directory name (e.g. img/cover)" />
+      <button id="loadDir">Load</button>
+      <button id="deleteDir">Delete Directory</button>
+      <div id="dirInfo" class="note"></div>
+
+      <div id="uploader" style="display:none;">
+        <h3>Images in <span id="curDir"></span></h3>
+        <ul id="imagesList"></ul>
+        <input id="imageUrl" placeholder="https://example.com/image.jpg" />
+        <button id="addImage">Add Image URL</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Test Random</h2>
+      <input id="testDir" placeholder="dir to test" />
+      <button id="testRandom">Open Random</button>
+      <div class="note">You can also open <code>/r/&lt;dir&gt;</code> or <code>/random?dir=...</code></div>
+    </section>
+
+    <footer>
+      <small>KV binding name expected: <code>wj</code>. Deploy to EdgeOne/Cloudflare Pages and bind a KV namespace.</small>
+    </footer>
+  </div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
