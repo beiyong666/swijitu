@@ -6,8 +6,14 @@ async function api(path, opts={}){
     const token = localStorage.getItem('adm_token');
     if(token) opts.headers['X-ADM-TOKEN'] = token;
     const res = await fetch('/api/'+path, opts);
-    const j = await res.json().catch(()=>({ ok:false, error: 'invalid json response', status: res.status }));
-    return j;
+    // if response is JSON-like, parse it; else try to return text as error
+    const text = await res.text();
+    try{
+      const j = JSON.parse(text);
+      return j;
+    }catch(e){
+      return { ok:false, error: 'invalid json response', status: res.status, body: text };
+    }
   }catch(e){
     return { ok:false, error: 'network error: '+e.message };
   }
@@ -33,7 +39,7 @@ async function refreshDirs(){
 async function openDir(name){
   el('#currentDir').textContent = name;
   const res = await api('dirs/'+name);
-  if(!res.ok){ alert('failed to open dir: '+(res.error||'')); return; }
+  if(!res.ok){ alert('failed to open dir: '+(res.error||'') + (res.body? '\\n' + res.body : '')); return; }
   const ul = el('#imgsList'); ul.innerHTML='';
   res.images.forEach(url=>{
     const li = document.createElement('li');
@@ -47,7 +53,7 @@ async function openDir(name){
 async function deleteDir(name){
   if(!confirm('Delete directory '+name+' ?')) return;
   const res = await api('dirs/'+name, { method:'DELETE' });
-  if(!res.ok) return alert('delete failed: '+(res.error||''));
+  if(!res.ok) return alert('delete failed: '+(res.error||'') + (res.body? '\\n' + res.body : ''));
   refreshDirs();
   el('#currentDir').textContent = '—';
   el('#imgsList').innerHTML = '';
@@ -59,7 +65,7 @@ async function addImg(){
   const url = el('#imgUrl').value.trim();
   if(!url) return alert('enter url');
   const res = await api('dirs/'+dir+'/images', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ url })});
-  if(!res.ok) return alert('add failed: '+(res.error||''));
+  if(!res.ok) return alert('add failed: '+(res.error||'') + (res.body? '\\n' + res.body : ''));
   el('#imgUrl').value='';
   openDir(dir);
 }
@@ -67,7 +73,7 @@ async function addImg(){
 async function removeImg(dir, url){
   if(!confirm('Remove this image?')) return;
   const res = await api('dirs/'+dir+'/images', { method:'DELETE', headers:{'content-type':'application/json'}, body: JSON.stringify({ url })});
-  if(!res.ok) return alert('remove failed: '+(res.error||''));
+  if(!res.ok) return alert('remove failed: '+(res.error||'') + (res.body? '\\n' + res.body : ''));
   openDir(dir);
 }
 
@@ -75,7 +81,7 @@ async function createDir(){
   const name = el('#newDirName').value.trim();
   if(!name) return alert('enter name');
   const res = await api('dirs', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name })});
-  if(!res.ok) return alert('create failed: '+(res.error||''));
+  if(!res.ok) return alert('create failed: '+(res.error||'') + (res.body? '\\n' + res.body : ''));
   el('#newDirName').value='';
   refreshDirs();
 }
@@ -92,6 +98,7 @@ async function login(){
     refreshDirs();
   }else{
     el('#loginMsg').textContent = j.error || 'login failed';
+    if(j.body) console.error('server returned non-json body:', j.body);
   }
 }
 
@@ -107,6 +114,8 @@ document.getElementById('addImgBtn').addEventListener('click', addImg);
       document.getElementById('loginBox').style.display='none';
       document.getElementById('adminArea').style.display='block';
       refreshDirs();
+    } else {
+      console.log('not logged in or cannot access dirs:', res);
     }
   }catch(e){ console.error(e); }
 })();

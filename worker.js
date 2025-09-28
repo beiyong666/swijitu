@@ -2,26 +2,30 @@
 /**
  * worker.js - EdgeOne Pages / Cloudflare Pages Functions style single file.
  *
+ * This patched version ensures ALL API endpoints under /api/ return JSON responses
+ * (content-type: application/json) even on error, to avoid "invalid json response"
+ * on the client side.
+ *
  * Bind a KV namespace to the Pages function with the variable name "WJ" (or "wj").
  * Set the ADMIN_PASSWORD environment variable to protect the admin UI.
  *
- * This version uses token-based admin auth: on successful /api/login the server
- * returns a token. The client stores the token and sends it in header X-ADM-TOKEN.
- * The token is saved in KV as admtoken:<token>.
+ * Token-based admin auth (same as prior).
  */
 
-const TEXT_JSON = { 'content-type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' };
+const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' };
+const HTML_HEADERS = { 'content-type': 'text/html; charset=UTF-8' };
 
 function jsonResponse(data, status=200) {
-  return new Response(JSON.stringify(data), { status, headers: TEXT_JSON });
+  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
 }
 
 function htmlResponse(text, status=200) {
-  return new Response(text, { status, headers: { 'content-type': 'text/html; charset=UTF-8' }});
+  return new Response(text, { status, headers: HTML_HEADERS });
 }
 
 function badRequest(msg) { return jsonResponse({ ok: false, error: msg }, 400); }
 function unauthorized(msg='unauthorized') { return jsonResponse({ ok: false, error: msg }, 401); }
+function serverError(msg='server error') { return jsonResponse({ ok: false, error: msg }, 500); }
 
 function getKV(env){
   return env.WJ || env.wj || env.WJ_KV || env.wj_kv || env.KV || null;
@@ -90,29 +94,32 @@ export async function onRequest(context) {
   const { request, env, params } = context;
   const url = new URL(request.url);
   const kv = getKV(env);
-  if(!kv){
-    return new Response('KV namespace not bound. Bind your KV to variable name WJ (or wj).', { status: 500 });
-  }
 
   const pathname = url.pathname || '/';
 
-  // API routing
+  // If path starts with /api, ensure kv is available and return JSON errors if not
   if(pathname.startsWith('/api/')){
+    if(!kv){
+      return serverError('KV namespace not bound. Bind your KV to variable name WJ (or wj).');
+    }
     if(request.method === 'OPTIONS'){
-      return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Methods':'GET,POST,DELETE,OPTIONS', 'Access-Control-Allow-Headers':'Content-Type' }});
+      return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin':'*', 'Access-Control-Allow-Methods':'GET,POST,DELETE,OPTIONS', 'Access-Control-Allow-Headers':'Content-Type,X-ADM-TOKEN' }});
     }
 
     const parts = pathname.replace(/^\/api\//,'').split('/').filter(Boolean);
     // /api/dirs
     if(parts.length === 1 && parts[0] === 'dirs'){
       if(request.method === 'GET'){
-        const dirs = await getDirs(kv);
-        return jsonResponse({ ok:true, dirs });
+        try{
+          const dirs = await getDirs(kv);
+          return jsonResponse({ ok:true, dirs });
+        }catch(e){
+          return serverError('failed to read dirs');
+        }
       }
       if(request.method === 'POST'){
         // create dir
         try{
-          // require admin
           if(!(await isAdmin(request, kv))) return unauthorized();
           const body = await request.json();
           if(!body.name) return badRequest('missing name');
@@ -125,7 +132,7 @@ export async function onRequest(context) {
           await setDirImages(kv,name,[]);
           return jsonResponse({ ok:true, name });
         }catch(e){
-          return badRequest('invalid json body');
+          return badRequest('invalid json body or server error');
         }
       }
       if(request.method === 'DELETE'){
@@ -139,18 +146,26 @@ export async function onRequest(context) {
       if(parts.length === 2){
         // operations on dir
         if(request.method === 'GET'){
-          const imgs = await getDirImages(kv,name);
-          return jsonResponse({ ok:true, name, images: imgs });
+          try{
+            const imgs = await getDirImages(kv,name);
+            return jsonResponse({ ok:true, name, images: imgs });
+          }catch(e){
+            return serverError('failed to read dir images');
+          }
         }
         if(request.method === 'DELETE'){
           // require admin
           if(!(await isAdmin(request, kv))) return unauthorized();
-          const dirs = await getDirs(kv);
-          const idx = dirs.indexOf(name);
-          if(idx !== -1) dirs.splice(idx,1);
-          await setDirs(kv, dirs);
-          await kv.delete('dir:'+name);
-          return jsonResponse({ ok:true, deleted: name });
+          try{
+            const dirs = await getDirs(kv);
+            const idx = dirs.indexOf(name);
+            if(idx !== -1) dirs.splice(idx,1);
+            await setDirs(kv, dirs);
+            await kv.delete('dir:'+name);
+            return jsonResponse({ ok:true, deleted: name });
+          }catch(e){
+            return serverError('failed to delete dir');
+          }
         }
       }
       if(parts.length === 3 && parts[2] === 'images'){
@@ -165,7 +180,7 @@ export async function onRequest(context) {
             await setDirImages(kv, name, imgs);
             return jsonResponse({ ok:true, name, added: body.url, images: imgs });
           }catch(e){
-            return badRequest('invalid json body');
+            return badRequest('invalid json body or server error');
           }
         }
         if(request.method === 'DELETE'){
@@ -179,7 +194,7 @@ export async function onRequest(context) {
             await setDirImages(kv,name,imgs);
             return jsonResponse({ ok:true, name, removed: body.url, images: imgs});
           }catch(e){
-            return badRequest('invalid json body');
+            return badRequest('invalid json body or server error');
           }
         }
       }
@@ -192,7 +207,7 @@ export async function onRequest(context) {
         if(!body.password) return badRequest('missing password');
         const adminPwd = env.ADMIN_PASSWORD || env.ADMIN_PASS || '';
         if(!adminPwd){
-          return new Response('Admin password not configured. Set ADMIN_PASSWORD in your environment.', { status: 500 });
+          return serverError('Admin password not configured. Set ADMIN_PASSWORD in your environment.');
         }
         if(body.password === adminPwd){
           // create a short-lived token and store in KV
@@ -204,11 +219,11 @@ export async function onRequest(context) {
           return unauthorized('bad password');
         }
       }catch(e){
-        return badRequest('invalid json body');
+        return badRequest('invalid json body or server error');
       }
     }
 
-    return new Response('API not found', { status: 404 });
+    return jsonResponse({ ok:false, error: 'API not found' }, 404);
   }
 
   // If path is /

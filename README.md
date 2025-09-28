@@ -1,9 +1,16 @@
 
-# Random Image Pages for EdgeOne Pages (fixed login)
+# Random Image Pages for EdgeOne Pages (API JSON response fix)
 
-This project is identical to the previous version but fixes the admin login issue by using a token-based authentication:
-- On successful login (`POST /api/login`), server returns `{ ok:true, token: "..." }`.
-- Client stores the token in `localStorage` and sends it via `X-ADM-TOKEN` header for protected API calls.
-- Server stores valid tokens in KV as `admtoken:<token>`.
+This patch ensures API endpoints under /api/ always respond with JSON (including errors),
+which fixes "invalid json response" on the admin UI.
 
-Deployment notes: same as before. Bind KV to `WJ` or `wj`, set `ADMIN_PASSWORD`.
+Common causes for "invalid json response":
+- KV not bound (server previously returned plain text). Now returns JSON error.
+- ADMIN_PASSWORD not set (server previously returned plain text). Now returns JSON error.
+- Unexpected server error that returned non-JSON; now many errors are returned as JSON.
+
+Deployment checklist:
+1. Bind KV Namespace to the Pages function variable `WJ` (or `wj`).
+2. Set `ADMIN_PASSWORD` environment variable.
+3. Deploy. If you still see "invalid json response", open browser devtools -> Network -> inspect the response body of `/api/login` or `/api/dirs` and paste it here and I will diagnose.
+
