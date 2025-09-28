@@ -1,33 +1,41 @@
-# EdgeOne / Cloudflare Pages - Random Image Directory (KV-backed)
 
-This project provides:
-- An admin UI (`/admin`) to create directories and upload image URLs to directories.
-- A KV-backed storage (binding name expected: `wj`) that stores arrays of image URLs under keys `dir:<directory>`.
-- A random image endpoint: `/r/<dir>` or `/random?dir=<dir>` which redirects (302) to a randomly selected image URL from the directory.
+# Random Image Pages for EdgeOne Pages
 
-## Files
-- `worker.js` - the main Cloudflare Worker/Pages function handler (routes and API).
-- `static/admin.html`, `static/app.js`, `static/style.css` - simple admin UI that calls the API.
-- `wrangler.toml` - example for deploying with Wrangler (you need to adjust account and KV bindings).
+This project implements a small EdgeOne Pages (Cloudflare Pages-like) site that:
+- Lets you create named directories and upload (store) image URLs to each directory (admin UI).
+- Visiting `https://yourdomain/<directory>` will redirect the visitor to a random image URL from that directory.
 
-## KV binding
-Create a Workers KV namespace in Cloudflare and bind it to the variable name `wj` in your Worker. The code expects `env.wj` to exist.
+## Setup
 
-## Example usage
-1. Create a directory:
-   ```
-   POST /api/dir
-   { "dir": "img/cover" }
-   ```
-2. Add an image URL:
-   ```
-   POST /api/upload
-   { "dir": "img/cover", "url": "https://example.com/a.jpg" }
-   ```
-3. Get random image:
-   Open `/r/img/cover` and you will be redirected to a random image URL from that directory.
+1. Bind a KV Namespace to your Pages Functions and name the binding `WJ` (or `wj`).
+2. Set an environment variable `ADMIN_PASSWORD` to a password for the admin UI.
+3. Deploy the site. The provided `worker.js` contains the server logic.
 
-## Notes & deployment ideas
-- This is a minimal implementation. In production you may want authentication for the admin UI.
-- If deploying as Cloudflare Pages, put `static` folder contents into the Pages site and deploy `worker.js` as a Pages Function or Worker with a route that proxies `/api/*` and `/r/*`.
-- The Worker uses simple KV keys `dir:<dir>` whose value is a JSON array of URLs.
+KV schema:
+- `dirs` — JSON array of directory names.
+- `dir:<name>` — JSON array of image URL strings for the directory.
+
+## Endpoints
+
+- `GET /api/dirs` — list directories
+- `POST /api/dirs` — create directory `{ "name": "mydir" }`
+- `DELETE /api/dirs/:name` — delete directory (admin)
+- `GET /api/dirs/:name` — list images in directory
+- `POST /api/dirs/:name/images` — add image `{ "url": "https://..." }` (admin)
+- `DELETE /api/dirs/:name/images` — remove image `{ "url": "https://..." }` (admin)
+- `POST /api/login` — `{ "password": "..." }` returns a cookie for admin actions
+- `GET /:dir` — redirect to a random image in dir
+
+## Files in this ZIP
+
+- `worker.js` — server logic (Pages Functions)
+- `index.html` — basic home page
+- `admin.html`  — admin interface
+- `admin.js`    — admin UI logic
+- `styles.css`  — basic styles
+- `README.md`   — this file
+
+## Notes & Security
+
+- This implementation uses a simple password + cookie strategy. For production, consider stronger session handling, CSRF protection and HTTPS configuration provided by Pages.
+- Make sure to choose a strong `ADMIN_PASSWORD`.
