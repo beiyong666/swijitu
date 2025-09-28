@@ -6,16 +6,14 @@ async function api(path, opts={}){
     const token = localStorage.getItem('adm_token');
     if(token) opts.headers['X-ADM-TOKEN'] = token;
     const res = await fetch('/api/'+path, opts);
-    // if response is JSON-like, parse it; else try to return text as error
     const text = await res.text();
     try{
-      const j = JSON.parse(text);
-      return j;
+      return JSON.parse(text);
     }catch(e){
-      return { ok:false, error: 'invalid json response', status: res.status, body: text };
+      return { ok:false, error:'invalid json response', status: res.status, body: text };
     }
   }catch(e){
-    return { ok:false, error: 'network error: '+e.message };
+    return { ok:false, error:'network error: '+e.message };
   }
 }
 
@@ -23,7 +21,7 @@ function el(q){return document.querySelector(q);}
 
 async function refreshDirs(){
   const res = await api('dirs');
-  if(!res.ok){ alert('failed to load dirs: '+(res.error||'')); return; }
+  if(!res.ok){ alert('failed to load dirs: '+(res.error||'') + (res.body? '\\n' + res.body : '')); return; }
   const list = el('#dirsList');
   list.innerHTML = '';
   res.dirs.forEach(d=>{

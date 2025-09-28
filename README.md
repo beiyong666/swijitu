@@ -1,16 +1,20 @@
 
-# Random Image Pages for EdgeOne Pages (API JSON response fix)
+# EdgeOne Pages compatible Random Image Pages
 
-This patch ensures API endpoints under /api/ always respond with JSON (including errors),
-which fixes "invalid json response" on the admin UI.
+This version uses EdgeOne Pages function signatures:
+- export async function onRequestGet({ request, env, params })
+- export async function onRequestPost({ request, env, params })
+- export async function onRequestDelete({ request, env, params })
 
-Common causes for "invalid json response":
-- KV not bound (server previously returned plain text). Now returns JSON error.
-- ADMIN_PASSWORD not set (server previously returned plain text). Now returns JSON error.
-- Unexpected server error that returned non-JSON; now many errors are returned as JSON.
+KV binding:
+- EdgeOne example used `wj` (lowercase). Bind your KV namespace to variable name `wj` (or `WJ`).
+- The code tries env.wj, env.WJ, and a global `wj` if present.
 
-Deployment checklist:
-1. Bind KV Namespace to the Pages function variable `WJ` (or `wj`).
-2. Set `ADMIN_PASSWORD` environment variable.
-3. Deploy. If you still see "invalid json response", open browser devtools -> Network -> inspect the response body of `/api/login` or `/api/dirs` and paste it here and I will diagnose.
+Deployment notes:
+1. Put `edgeone_worker.js` (rename to `worker.js` if your Pages expects that) into your Pages Functions folder.
+2. Place `index.html`, `admin.html`, `admin.js`, `styles.css` into your static assets folder (root).
+3. Set environment variable `ADMIN_PASSWORD`.
+4. Bind KV Namespace to `wj` or `WJ`.
+5. Deploy and visit /admin to login.
 
+If you still get "invalid json response", open browser devtools -> Network -> find the failing `/api/*` request -> copy the Response body and paste it here. I'll diagnose immediately.
