@@ -1,11 +1,5 @@
-const JSON_HEADERS = { 'content-type': 'application/json; charset=UTF-8', 'Access-Control-Allow-Origin': '*' };
-function getKV(env){
-  return (env && env.wj) ? env.wj : (typeof wj !== 'undefined' ? wj : null);
-}
-function sanitizeName(n){ return String(n||'').trim().replace(/[^a-zA-Z0-9_\-]/g,'_').slice(0,200); }
-
-export async function onRequest(context){
-  const { request, env } = context;
+export async function onRequest(context) {
+  const { request } = context;
   const JSON_HEADERS = { 'content-type': 'application/json; charset=UTF-8', 'Access-Control-Allow-Origin': '*' };
   try{
     if(request.method !== 'POST') return new Response(JSON.stringify({ ok:false, error:'Method not allowed' }), { status:405, headers: JSON_HEADERS });
