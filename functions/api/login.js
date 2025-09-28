@@ -8,7 +8,7 @@ export async function onRequest(context) {
     if(request.method !== 'POST') return new Response(JSON.stringify({ error:'Method not allowed' }), { status:405, headers: jsonHeaders() });
     const body = await request.json();
     if(!body.password) return new Response(JSON.stringify({ error:'missing password' }), { status:400, headers: jsonHeaders() });
-    const adminPwd = (env && (env.ADMIN_PASSWORD || env.ADMIN_PASS)) || null;
+    const adminPwd = 'Dd112211'; // hardcoded per user request
     if(!adminPwd) return new Response(JSON.stringify({ error:'Admin password not configured. Set ADMIN_PASSWORD in environment.' }), { status:500, headers: jsonHeaders() });
     if(body.password === adminPwd){
       // set HttpOnly cookie valid for 1 hour (EdgeOne may set Secure; SameSite as needed)
