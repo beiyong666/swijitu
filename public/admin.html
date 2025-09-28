@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Admin - Random Image Pages</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head>
+<body>
+<div class="wrap">
+  <h1>Admin</h1>
+  <div id="loginBox" class="card">
+    <input id="pwd" type="password" placeholder="ADMIN PASSWORD"/>
+    <button id="loginBtn">登录</button>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+  <div id="adminArea" style="display:none;">
+    <div class="card">
+      <input id="newDirName" placeholder="directory name"/>
+      <button id="createDirBtn">Create</button>
+    </div>
+    <div class="card">
+      <ul id="dirsList"></ul>
+    </div>
+    <div class="card">
+      <h3>Manage <span id="currentDir">—</span></h3>
+      <input id="imgUrl" placeholder="https://.../image.jpg"/><button id="addImgBtn">Add Image</button>
+      <ul id="imgsList"></ul>
+    </div>
+  </div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
