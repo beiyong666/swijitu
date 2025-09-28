@@ -1,20 +1,22 @@
-export async function onRequest(context) {
-  const { request, env } = context;
-  const kv = (env && env.wj) ? env.wj : (typeof wj !== 'undefined' ? wj : null);
+export async function onRequestGet({ request, env, params }) {
+  const wj = (env && env.wj) ? env.wj : (typeof wj !== 'undefined' ? wj : null);
+  const JSON_HEADERS = { 'content-type': 'application/json; charset=UTF-8', 'Access-Control-Allow-Origin': '*' };
   const url = new URL(request.url);
   const pathname = url.pathname || '/';
-  if(pathname.startsWith('/api/')) return new Response(null, { status: 404 });
-  if(pathname === '/' || pathname === '/index.html' || pathname === '/admin.html') return fetch(request);
-  const maybeDir = pathname.replace(/^\//,'').replace(/\/$/,'');
-  if(maybeDir){
-    if(!kv) return new Response('not found', { status:404 });
-    const raw = await kv.get('dir:'+maybeDir);
-    if(!raw) return new Response('not found', { status:404 });
-    let imgs = [];
-    try{ imgs = JSON.parse(raw); }catch(e){ imgs = []; }
-    if(!imgs || imgs.length===0) return new Response('not found', { status:404 });
-    const idx = Math.floor(Math.random()*imgs.length);
-    return Response.redirect(imgs[idx], 302);
+  if(pathname === '/' || pathname === '/index.html' || pathname === '/admin.html') {
+    return fetch(request);
+  }
+  const maybe = pathname.replace(/^\//,'').replace(/\/$/,'');
+  if(maybe){
+    if(!wj) return new Response(JSON.stringify({ error:'KV binding wj not found' }), { status:500, headers: JSON_HEADERS });
+    const key = 'dir:' + maybe;
+    const raw = await wj.get(key);
+    if(!raw) return new Response('目录不存在或没有图片', { status:404 });
+    let list = [];
+    try{ list = JSON.parse(raw); }catch(e){ list = []; }
+    if(!list || list.length === 0) return new Response('目录不存在或没有图片', { status:404 });
+    const idx = Math.floor(Math.random() * list.length);
+    return Response.redirect(list[idx], 302);
   }
   return fetch(request);
 }

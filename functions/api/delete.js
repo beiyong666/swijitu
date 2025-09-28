@@ -1,33 +1,35 @@
 export async function onRequest(context) {
   const { request, env } = context;
-  const kv = (env && env.wj) ? env.wj : (typeof wj !== 'undefined' ? wj : null);
-  function jsonHeaders(){ return { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin':'*' }; }
-  if(!kv) return new Response(JSON.stringify({ error: 'KV binding "wj" not found.' }), { status:500, headers: jsonHeaders() });
+  const wj = (env && env.wj) ? env.wj : (typeof wj !== 'undefined' ? wj : null);
+  const JSON_HEADERS = { 'content-type': 'application/json; charset=UTF-8', 'Access-Control-Allow-Origin': '*' };
+  if(!wj) return new Response(JSON.stringify({ error: 'KV binding "wj" not found.' }), { status:500, headers: JSON_HEADERS });
   try{
-    if(request.method !== 'POST') return new Response(JSON.stringify({ error:'Method not allowed' }), { status:405, headers: jsonHeaders() });
-    const body = await request.json();
-    if(!body.dir) return new Response(JSON.stringify({ error:'missing dir' }), { status:400, headers: jsonHeaders() });
-    const name = String(body.dir).trim().replace(/[^a-zA-Z0-9_\-]/g,'_').slice(0,200);
+    if(request.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status:405, headers: JSON_HEADERS });
+    const body = await request.json().catch(()=>{ return null; });
+    if(!body || !body.dir) return new Response(JSON.stringify({ error: 'missing dir' }), { status:400, headers: JSON_HEADERS });
+    const dir = String(body.dir).trim().replace(/[^a-zA-Z0-9_\-]/g,'_').slice(0,200);
+    const key = 'dir:' + dir;
     if(body.deleteDir){
-      const dirsRaw = await kv.get('dirs');
+      // delete dir and remove from dirs list
+      await wj.delete(key);
+      const rawDirs = await wj.get('dirs');
       let dirs = [];
-      if(dirsRaw){ try{ dirs = JSON.parse(dirsRaw); }catch(e){ dirs = []; } }
-      const idx = dirs.indexOf(name);
+      if(rawDirs){ try{ dirs = JSON.parse(rawDirs); }catch(e){ dirs = []; } }
+      const idx = dirs.indexOf(dir);
       if(idx !== -1) dirs.splice(idx,1);
-      await kv.put('dirs', JSON.stringify(dirs));
-      await kv.delete('dir:'+name);
-      return new Response(JSON.stringify({ ok:true, deleted: name }), { status:200, headers: jsonHeaders() });
+      await wj.put('dirs', JSON.stringify(dirs));
+      return new Response(JSON.stringify({ ok:true, deleted: dir }), { headers: JSON_HEADERS });
     } else if(body.url){
-      const raw = await kv.get('dir:'+name);
-      let imgs = [];
-      if(raw){ try{ imgs = JSON.parse(raw); }catch(e){ imgs = []; } }
-      imgs = imgs.filter(u => u !== body.url);
-      await kv.put('dir:'+name, JSON.stringify(imgs));
-      return new Response(JSON.stringify({ ok:true, name, images: imgs }), { status:200, headers: jsonHeaders() });
+      const raw = await wj.get(key);
+      let list = [];
+      if(raw){ try{ list = JSON.parse(raw); }catch(e){ list = []; } }
+      list = list.filter(u => u !== body.url);
+      await wj.put(key, JSON.stringify(list));
+      return new Response(JSON.stringify({ ok:true, name: dir, images: list }), { headers: JSON_HEADERS });
     } else {
-      return new Response(JSON.stringify({ error:'missing url or deleteDir flag' }), { status:400, headers: jsonHeaders() });
+      return new Response(JSON.stringify({ error: 'missing url or deleteDir flag' }), { status:400, headers: JSON_HEADERS });
     }
-  }catch(e){
-    return new Response(JSON.stringify({ error: String(e) }), { status:500, headers: jsonHeaders() });
+  }catch(err){
+    return new Response(JSON.stringify({ error: String(err) }), { status:500, headers: JSON_HEADERS });
   }
 }

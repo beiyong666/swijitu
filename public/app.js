@@ -1,5 +1,6 @@
 function el(q){return document.querySelector(q);}
-function jsonHeaders(){ return {'Content-Type':'application/json'}; }
+function headers(){ return {'content-type':'application/json'}; }
+
 async function api(path, opts={}){
   try{
     opts = opts || {};
@@ -14,7 +15,7 @@ async function refreshDirs(){
   const res = await api('list');
   if(!res.ok) return console.error('加载目录失败', res);
   const ul = document.getElementById('dirsList'); ul.innerHTML='';
-  res.dirs.forEach(d=>{
+  (res.dirs||[]).forEach(d=>{
     const li = document.createElement('li'); li.textContent = d + ' ';
     const open = document.createElement('button'); open.textContent='打开'; open.onclick=()=>openDir(d);
     const del = document.createElement('button'); del.textContent='删除'; del.onclick=()=>deleteDir(d);
@@ -27,7 +28,7 @@ async function openDir(name){
   const res = await api('list?dir='+encodeURIComponent(name));
   if(!res.ok) return alert('打开目录失败: '+(res.error||'') + (res.body? '\n'+res.body : ''));
   const ul = document.getElementById('imgsList'); ul.innerHTML='';
-  res.images.forEach(url=>{
+  (res.images||[]).forEach(url=>{
     const li = document.createElement('li');
     const a = document.createElement('a'); a.href=url; a.target='_blank'; a.textContent=url;
     const btn = document.createElement('button'); btn.textContent='删除'; btn.onclick=()=>removeImg(name,url);
@@ -37,7 +38,7 @@ async function openDir(name){
 
 async function createDir(){
   const name = document.getElementById('newDirName').value.trim(); if(!name) return alert('请输入名称');
-  const res = await api('upload', { method:'POST', headers: jsonHeaders(), body: JSON.stringify({ dir: name, url: '' }) });
+  const res = await api('upload', { method:'POST', headers: headers(), body: JSON.stringify({ dir: name, url: '' }) });
   if(!res.ok) return alert('创建失败: '+(res.error||'') + (res.body? '\n'+res.body : ''));
   document.getElementById('newDirName').value=''; refreshDirs();
 }
@@ -45,21 +46,21 @@ async function createDir(){
 async function addImg(){
   const dir = document.getElementById('currentDir').textContent; if(!dir || dir==='—') return alert('请先打开目录');
   const url = document.getElementById('imgUrl').value.trim(); if(!url) return alert('请输入图片链接');
-  const res = await api('upload', { method:'POST', headers: jsonHeaders(), body: JSON.stringify({ dir: dir, url: url }) });
+  const res = await api('upload', { method:'POST', headers: headers(), body: JSON.stringify({ dir: dir, url: url }) });
   if(!res.ok) return alert('添加失败: '+(res.error||'') + (res.body? '\n'+res.body : ''));
   document.getElementById('imgUrl').value=''; openDir(dir);
 }
 
 async function removeImg(dir, url){
   if(!confirm('确认删除该图片？')) return;
-  const res = await api('delete', { method:'POST', headers: jsonHeaders(), body: JSON.stringify({ dir: dir, url: url }) });
+  const res = await api('delete', { method:'POST', headers: headers(), body: JSON.stringify({ dir: dir, url: url }) });
   if(!res.ok) return alert('删除失败: '+(res.error||'') + (res.body? '\n'+res.body : ''));
   openDir(dir);
 }
 
 async function deleteDir(name){
   if(!confirm('确认删除目录 '+name+' ?')) return;
-  const res = await api('delete', { method:'POST', headers: jsonHeaders(), body: JSON.stringify({ dir: name, deleteDir:true }) });
+  const res = await api('delete', { method:'POST', headers: headers(), body: JSON.stringify({ dir: name, deleteDir:true }) });
   if(!res.ok) return alert('删除失败: '+(res.error||'') + (res.body? '\n'+res.body : ''));
   refreshDirs(); document.getElementById('currentDir').textContent='—';
 }
@@ -67,7 +68,7 @@ async function deleteDir(name){
 async function login(){
   const pwd = document.getElementById('pwd').value;
   document.getElementById('loginMsg').textContent = '正在登录...';
-  const res = await fetch('/api/login', { method:'POST', headers: jsonHeaders(), body: JSON.stringify({ password: pwd })});
+  const res = await fetch('/api/login', { method:'POST', headers: headers(), body: JSON.stringify({ password: pwd })});
   const text = await res.text();
   try{
     const j = JSON.parse(text);
