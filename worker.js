@@ -5,20 +5,9 @@
  * Bind a KV namespace to the Pages function with the variable name "WJ" (or "wj").
  * Set the ADMIN_PASSWORD environment variable to protect the admin UI.
  *
- * KV schema:
- * - key "dirs" -> JSON array of directory names
- * - key "dir:<name>" -> JSON array of image URL strings
- *
- * Endpoints:
- * - GET  /api/dirs                  -> list directories
- * - POST /api/dirs                  -> create directory { name }
- * - DELETE /api/dirs/:name          -> delete directory
- * - GET  /api/dirs/:name            -> list images in directory
- * - POST /api/dirs/:name/images     -> add image { url }
- * - DELETE /api/dirs/:name/images   -> remove image { url }
- * - POST /api/login                 -> { password } => sets cookie if ok
- * - GET  /admin, /admin/*           -> serve admin static page (handled by Pages static files)
- * - GET  /{dir}                     -> redirect to a random image in that dir (302)
+ * This version uses token-based admin auth: on successful /api/login the server
+ * returns a token. The client stores the token and sends it in header X-ADM-TOKEN.
+ * The token is saved in KV as admtoken:<token>.
  */
 
 const TEXT_JSON = { 'content-type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' };
@@ -80,6 +69,23 @@ function parseCookies(req){
   return parts;
 }
 
+/**
+ * isAdmin - checks if request is authorized as admin.
+ * Supports:
+ * - cookie adm=1 (legacy)
+ * - header X-ADM-TOKEN: <token> which is stored in KV as admtoken:<token>
+ */
+async function isAdmin(request, kv){
+  const cookie = parseCookies(request);
+  if(cookie.adm === '1') return true;
+  const tokenHeader = request.headers.get('x-adm-token') || request.headers.get('X-ADM-TOKEN');
+  if(tokenHeader){
+    const v = await kv.get('admtoken:'+tokenHeader);
+    return !!v;
+  }
+  return false;
+}
+
 export async function onRequest(context) {
   const { request, env, params } = context;
   const url = new URL(request.url);
@@ -106,6 +112,8 @@ export async function onRequest(context) {
       if(request.method === 'POST'){
         // create dir
         try{
+          // require admin
+          if(!(await isAdmin(request, kv))) return unauthorized();
           const body = await request.json();
           if(!body.name) return badRequest('missing name');
           const name = sanitizeName(body.name);
@@ -136,8 +144,7 @@ export async function onRequest(context) {
         }
         if(request.method === 'DELETE'){
           // require admin
-          const cookie = parseCookies(request);
-          if(!cookie.adm || cookie.adm !== '1') return unauthorized();
+          if(!(await isAdmin(request, kv))) return unauthorized();
           const dirs = await getDirs(kv);
           const idx = dirs.indexOf(name);
           if(idx !== -1) dirs.splice(idx,1);
@@ -149,8 +156,7 @@ export async function onRequest(context) {
       if(parts.length === 3 && parts[2] === 'images'){
         if(request.method === 'POST'){
           // require admin
-          const cookie = parseCookies(request);
-          if(!cookie.adm || cookie.adm !== '1') return unauthorized();
+          if(!(await isAdmin(request, kv))) return unauthorized();
           try{
             const body = await request.json();
             if(!body.url) return badRequest('missing url');
@@ -164,8 +170,7 @@ export async function onRequest(context) {
         }
         if(request.method === 'DELETE'){
           // require admin
-          const cookie = parseCookies(request);
-          if(!cookie.adm || cookie.adm !== '1') return unauthorized();
+          if(!(await isAdmin(request, kv))) return unauthorized();
           try{
             const body = await request.json();
             if(!body.url) return badRequest('missing url');
@@ -190,9 +195,11 @@ export async function onRequest(context) {
           return new Response('Admin password not configured. Set ADMIN_PASSWORD in your environment.', { status: 500 });
         }
         if(body.password === adminPwd){
-          // set cookie
-          const headers = { 'Set-Cookie': 'adm=1; Path=/; HttpOnly', ...TEXT_JSON };
-          return new Response(JSON.stringify({ ok:true }), { status:200, headers });
+          // create a short-lived token and store in KV
+          const token = (Math.random().toString(36).slice(2) + Date.now().toString(36));
+          await kv.put('admtoken:'+token, '1');
+          // return token to client (client will store it and send in X-ADM-TOKEN header)
+          return jsonResponse({ ok:true, token });
         }else{
           return unauthorized('bad password');
         }
@@ -206,8 +213,6 @@ export async function onRequest(context) {
 
   // If path is /
   if(pathname === '/' || pathname === '/index.html'){
-    // let Pages static files handle it (this function could return static content)
-    // But we will serve a tiny index explaining usage
     const html = `
 <html>
 <head><meta charset="utf-8"><title>Random Image Pages</title></head>

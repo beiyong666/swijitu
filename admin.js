@@ -1,14 +1,23 @@
 
 async function api(path, opts={}){
-  const res = await fetch('/api/'+path, opts);
-  return res.json();
+  try{
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    const token = localStorage.getItem('adm_token');
+    if(token) opts.headers['X-ADM-TOKEN'] = token;
+    const res = await fetch('/api/'+path, opts);
+    const j = await res.json().catch(()=>({ ok:false, error: 'invalid json response', status: res.status }));
+    return j;
+  }catch(e){
+    return { ok:false, error: 'network error: '+e.message };
+  }
 }
 
 function el(q){return document.querySelector(q);}
 
 async function refreshDirs(){
   const res = await api('dirs');
-  if(!res.ok){ alert('failed to load dirs'); return; }
+  if(!res.ok){ alert('failed to load dirs: '+(res.error||'')); return; }
   const list = el('#dirsList');
   list.innerHTML = '';
   res.dirs.forEach(d=>{
@@ -24,7 +33,7 @@ async function refreshDirs(){
 async function openDir(name){
   el('#currentDir').textContent = name;
   const res = await api('dirs/'+name);
-  if(!res.ok){ alert('failed to open dir'); return; }
+  if(!res.ok){ alert('failed to open dir: '+(res.error||'')); return; }
   const ul = el('#imgsList'); ul.innerHTML='';
   res.images.forEach(url=>{
     const li = document.createElement('li');
@@ -37,9 +46,8 @@ async function openDir(name){
 
 async function deleteDir(name){
   if(!confirm('Delete directory '+name+' ?')) return;
-  const res = await fetch('/api/dirs/'+name, { method:'DELETE' });
-  const j = await res.json();
-  if(!j.ok) return alert('delete failed: '+(j.error||''));
+  const res = await api('dirs/'+name, { method:'DELETE' });
+  if(!res.ok) return alert('delete failed: '+(res.error||''));
   refreshDirs();
   el('#currentDir').textContent = '—';
   el('#imgsList').innerHTML = '';
@@ -50,38 +58,37 @@ async function addImg(){
   if(!dir || dir==='—') return alert('open a directory first');
   const url = el('#imgUrl').value.trim();
   if(!url) return alert('enter url');
-  const res = await fetch('/api/dirs/'+dir+'/images', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ url })});
-  const j = await res.json();
-  if(!j.ok) return alert('add failed: '+(j.error||''));
+  const res = await api('dirs/'+dir+'/images', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ url })});
+  if(!res.ok) return alert('add failed: '+(res.error||''));
   el('#imgUrl').value='';
   openDir(dir);
 }
 
 async function removeImg(dir, url){
   if(!confirm('Remove this image?')) return;
-  const res = await fetch('/api/dirs/'+dir+'/images', { method:'DELETE', headers:{'content-type':'application/json'}, body: JSON.stringify({ url })});
-  const j = await res.json();
-  if(!j.ok) return alert('remove failed: '+(j.error||''));
+  const res = await api('dirs/'+dir+'/images', { method:'DELETE', headers:{'content-type':'application/json'}, body: JSON.stringify({ url })});
+  if(!res.ok) return alert('remove failed: '+(res.error||''));
   openDir(dir);
 }
 
 async function createDir(){
   const name = el('#newDirName').value.trim();
   if(!name) return alert('enter name');
-  const res = await fetch('/api/dirs', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name })});
-  const j = await res.json();
-  if(!j.ok) return alert('create failed: '+(j.error||''));
+  const res = await api('dirs', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ name })});
+  if(!res.ok) return alert('create failed: '+(res.error||''));
   el('#newDirName').value='';
   refreshDirs();
 }
 
 async function login(){
   const pwd = el('#pwd').value;
-  const res = await fetch('/api/login', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ password: pwd })});
-  const j = await res.json();
+  el('#loginMsg').textContent = 'Logging in...';
+  const j = await api('login', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ password: pwd })});
   if(j.ok){
+    if(j.token) localStorage.setItem('adm_token', j.token);
     el('#loginBox').style.display='none';
     el('#adminArea').style.display='block';
+    el('#loginMsg').textContent = '';
     refreshDirs();
   }else{
     el('#loginMsg').textContent = j.error || 'login failed';
@@ -101,5 +108,5 @@ document.getElementById('addImgBtn').addEventListener('click', addImg);
       document.getElementById('adminArea').style.display='block';
       refreshDirs();
     }
-  }catch(e){}
+  }catch(e){ console.error(e); }
 })();
