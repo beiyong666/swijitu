@@ -1,25 +1,26 @@
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>Admin - Random Image Pages</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head>
+<head><meta charset="utf-8"><title>管理 - 随机图 Pages</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head>
 <body>
 <div class="wrap">
-  <h1>Admin</h1>
+  <h1>管理面板</h1>
   <div id="loginBox" class="card">
-    <input id="pwd" type="password" placeholder="ADMIN PASSWORD"/>
+    <input id="pwd" type="password" placeholder="请输入管理密码"/>
     <button id="loginBtn">登录</button>
     <div id="loginMsg" class="msg"></div>
   </div>
   <div id="adminArea" style="display:none;">
     <div class="card">
-      <input id="newDirName" placeholder="directory name"/>
-      <button id="createDirBtn">Create</button>
+      <input id="newDirName" placeholder="目录名称"/>
+      <button id="createDirBtn">创建目录</button>
     </div>
     <div class="card">
+      <h3>目录列表</h3>
       <ul id="dirsList"></ul>
     </div>
     <div class="card">
-      <h3>Manage <span id="currentDir">—</span></h3>
-      <input id="imgUrl" placeholder="https://.../image.jpg"/><button id="addImgBtn">Add Image</button>
+      <h3>管理目录 <span id="currentDir">—</span></h3>
+      <input id="imgUrl" placeholder="https://.../image.jpg"/><button id="addImgBtn">添加图片</button>
       <ul id="imgsList"></ul>
     </div>
   </div>
